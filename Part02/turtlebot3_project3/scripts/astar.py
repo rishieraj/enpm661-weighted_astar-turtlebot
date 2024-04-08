@@ -176,6 +176,8 @@ def astar(start, goal, rpm):
     RPM1 = rpm[0]
     RPM2 = rpm[1]
 
+    print("Searching for the goal...")
+
     while not open_list.empty():
         current_node = open_list.get()
 
@@ -184,7 +186,7 @@ def astar(start, goal, rpm):
 
         close_list.add(current_node[2])
 
-        if m.dist((current_node[2][0], current_node[2][1]), (goal[0], goal[1])) <= (20 / SCALE_FACTOR):
+        if m.dist((current_node[2][0], current_node[2][1]), (goal[0], goal[1])) <= (15 / SCALE_FACTOR):
             print('Goal Reached!')
             # calling backtracking function after goal node is reached
             path, wheel_rpms = back_tracking(parent_map, rpm_map, start, current_node[2])
@@ -210,9 +212,6 @@ def astar(start, goal, rpm):
         for next_node in next_nodes:
             if not is_close(next_node[2], close_list):
                 if next_node[2] not in [x[2] for x in open_list.queue]:
-                    cv2.line(canvas, pt1=(current_node[2][0], current_node[2][1]), pt2=(next_node[2][0], next_node[2][1]), color=(0, 255, 0), thickness=1)
-                    cv2.imshow('Optimal Path Animation', canvas)
-                    cv2.waitKey(int(0.001 * 1000))
                     parent_map[next_node[2]] = current_node[2]
                     rpm_map[next_node[2]] = (next_node[3], next_node[4])
                     open_list.put(tuple(next_node))
@@ -275,25 +274,11 @@ def turtlebot(speeds, args=None):
 ########################################## Function for asking user input of start and goal nodes #######################################
 def user_input(obs_space):
     while True:
-        user_input_start = input("Enter the coordinates of the  start node as (X, Y, Orientation): ")
         user_input_goal = input("Enter the coordinates of the  goal node as (X, Y): ")
-        user_input_rpms = input("Enter the RPMs for the robot wheels: ")
 
         try:
-            start_parts = user_input_start.strip().split()
-            start_points = list(map(lambda x: round(int(x) / SCALE_FACTOR), start_parts[:2]))
-            start_state = (start_points[0] + round(500 / SCALE_FACTOR), start_points[1] + round(1000 / SCALE_FACTOR), int(start_parts[2]))
-
             goal_points = list(map(lambda x: round(int(x) / SCALE_FACTOR), user_input_goal.strip().split()))
             goal_state = (goal_points[0] + round(500 / SCALE_FACTOR), goal_points[1] + round(1000 / SCALE_FACTOR))
-
-            rpm = tuple(map(lambda x: round(int(x) / 60), user_input_rpms.strip().split()))
-            
-            if (start_state[0] not in range(0, obs_space.shape[0])) and (start_state[1] not in range(0, obs_space.shape[1])):
-                raise ValueError("Invalid start node.")
-            
-            if np.array_equal(obs_space[start_state[1], start_state[0], :], BLUE) or np.array_equal(obs_space[start_state[1], start_state[0], :], BLACK):
-                raise ValueError("Invalid start node.")
             
             if (goal_state[0] not in range(0, obs_space.shape[0])) and (goal_state[1] not in range(0, obs_space.shape[1])):
                 raise ValueError("Invalid goal node.")
@@ -301,7 +286,7 @@ def user_input(obs_space):
             if np.array_equal(obs_space[goal_state[1], goal_state[0], :], BLUE) or np.array_equal(obs_space[goal_state[1], goal_state[0], :], BLACK):
                 raise ValueError("Invalid goal node.")
             
-            return start_state, goal_state, rpm
+            return goal_state
         
         except ValueError as e:
             print(e)
@@ -309,29 +294,17 @@ def user_input(obs_space):
 
 if __name__ == '__main__':
 	
-    user_input_clearance = input("Enter the clearance between robot and obstacles: ")
-
-    clearance = int(user_input_clearance) / SCALE_FACTOR
+    start_point = (50, 100, 0)
+    clearance = 2
+    rpm = (round(40 / 60), round(80 / 60))
 
     # creating configuration space
     obs_space = config_space()
     # taking input for start and goal
-    start_point, goal_point, rpm = user_input(obs_space)
-    # creating opencv video writing objects
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter('a_star_rishie_uthappa.mp4', fourcc, 20.0, (600, 200))
+    goal_point= user_input(obs_space)
 
     # timer object to measure computation time
     timer_start = time.time()
-
-    # # implementing dijkstra
-    # optimal_path, visit_map = astar(start_point, goal_point, rpm, obs_space)
-
-    # creating a visualization window
-    cv2.namedWindow('Optimal Path Animation', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Optimal Path Animation', round(6000 / SCALE_FACTOR), round(4000 / SCALE_FACTOR))
-
-    canvas = obs_space
 
     # implementing dijkstra
     optimal_path, wheel_rpms, visit_map = astar(start_point, goal_point, rpm)
@@ -339,44 +312,6 @@ if __name__ == '__main__':
     timer_stop = time.time()
     c_time = timer_stop - timer_start
     print("Total Runtime: ", c_time)
-
-    ############################################## Display the node exploration #######################################################
-    count = 0
-
-    # displaying node exploration
-    for key in visit_map.keys():
-        if visit_map[key] == None:
-            continue
-
-        adjusted_parent_point = (int(visit_map[key][0]), int(visit_map[key][1]))
-        adjusted_child_point = (int(key[0]), int(key[1]))
-
-        cv2.arrowedLine(canvas, pt1=adjusted_parent_point, pt2=adjusted_child_point, color=(0, 255, 0), thickness=1, tipLength=0.2)
-
-        # skipping frames for faster visualization
-        if count % 1 == 0:
-            cv2.imshow('Optimal Path Animation', canvas)
-            cv2.waitKey(int(0.001 * 1000))
-            out.write(canvas)
-        
-        count += 1
-
-    # displaying optimal path
-    for point in optimal_path:
-        adjusted_point = (int(point[0]), int(point[1]))
-
-        cv2.circle(canvas, adjusted_point, int(RADIUS / (4 * SCALE_FACTOR)), (0, 0, 255), -1)
-        
-        cv2.imshow('Optimal Path Animation', canvas)
-        cv2.waitKey(int(0.001 * 1000))
-        out.write(canvas)
-
-    # holding final frame till any key is pressed
-    cv2.waitKey(0)
-    # releasing video write object
-    out.release()
-    # destroying visualization window after keypress
-    cv2.destroyAllWindows()
 
     # convverting rpms to speeds for publishing to turtlebot
     speeds = convert_speed(wheel_rpms)
