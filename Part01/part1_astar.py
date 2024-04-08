@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# GitHub Repository: 
+# GitHub Repository: https://github.com/rishieraj/enpm661-weighted_astar-turtlebot.git
 
 ############################################ Import the required libraries ##########################################################
 import numpy as np
